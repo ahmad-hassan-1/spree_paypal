@@ -23,7 +23,11 @@ module Spree
       response = service.capture_order(params[:orderID])
 
       if response['status'] == 'COMPLETED'
+        order.update_from_params(params, permitted_checkout_attributes)
         process_spree_payment(order, payment_method, response)
+        order.save
+        order.next until order.completed? || order.errors.any?
+        order.finalize!
         render json: { status: 'success', details: response }, status: :ok
       else
         render json: { error: 'Capture failed' }, status: :unprocessable_entity
@@ -43,21 +47,29 @@ module Spree
         payment_method_id: payment_method.id,
         transaction_id: paypal_response['id']
       )
-
-      payment = order.payments.create!(
-        payment_method: payment_method,
-        amount: order.total,
-        state: 'completed',
-        response_code: paypal_response['id'],
-        source: paypal_source, # You could create a PayPal-specific payment source if necessary
-        avs_response: paypal_response['payer']['payer_id']
-      )
+      payment = order.payments.first
+      if payment
+        payment.update(
+          payment_method: payment_method,
+          amount: order.total,
+          state: 'checkout',
+          response_code: paypal_response['id'],
+          source: paypal_source, # You could create a PayPal-specific payment source if necessary
+          avs_response: paypal_response['payer']['payer_id']
+        )
+      else
+        order.payments.create(
+          payment_method: payment_method,
+          amount: order.total,
+          state: 'checkout',
+          response_code: paypal_response['id'],
+          source: paypal_source, # You could create a PayPal-specific payment source if necessary
+          avs_response: paypal_response['payer']['payer_id']
+        )
+      end
 
       # Only transition the order if it's not already completed
-      if order.state != 'complete'
-        order.next! if order.state == 'payment'
-      end
-      payment.complete! unless payment.completed?
+      # payment.complete! unless payment.completed?
     end
   end
 end

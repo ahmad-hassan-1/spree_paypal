@@ -36,16 +36,16 @@
       }
     },
     onApprove: function(data, actions) {
+      const formData = new FormData(jQuery('form')[0]);
+      formData.delete('_method');
+      formData.append('payment_method_id', '<%= payment_method.id %>');
+      formData.append('orderID', data.orderID);
       return fetch('/paypal/capture_order', {
         method: 'post',
         headers: {
-          'Content-Type': 'application/json',
           'X-CSRF-Token': '<%= form_authenticity_token %>'
         },
-        body: JSON.stringify({
-          orderID: data.orderID,
-          payment_method_id: '<%= payment_method.id %>'
-        })
+        body: formData
       }).then(function(res) {
         return res.json();
       }).then(function(details) {

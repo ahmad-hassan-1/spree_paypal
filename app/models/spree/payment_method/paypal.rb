@@ -12,6 +12,10 @@ module Spree
       %w{capture void}
     end
 
+    def purchase(amount, source, options = {})
+      ActiveMerchant::Billing::Response.new(true, 'Paypal Gateway', {})
+    end
+
     def auto_capture?
       true
     end
