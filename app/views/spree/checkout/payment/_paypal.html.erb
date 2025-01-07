@@ -4,6 +4,22 @@
 
 <script>
   paypal.Buttons({
+    onClick: function(data, actions) {
+      const form = jQuery('form')[0];     
+      if (
+        jQuery("input[name=order\\[bill_address_id\\]].other-address")[0] &&
+        jQuery("input[name=order\\[bill_address_id\\]].other-address")[0].checked
+        ||
+        jQuery("input[name=order\\[bill_address_id\\]].other-address").length == 0
+      ) {
+        if (form.checkValidity()) {
+          return actions.resolve();
+        } else {
+          form.classList.add('was-validated');
+          return actions.reject();
+        }
+      }
+    },
     createOrder: async function(data, actions) {
       try {
         const response = await fetch('/paypal/create_order', {
@@ -38,6 +54,9 @@
     onApprove: function(data, actions) {
       const formData = new FormData(jQuery('form')[0]);
       formData.delete('_method');
+      if (jQuery("input[name=order\\[bill_address_id\\]].other-address")[0] && !jQuery("input[name=order\\[bill_address_id\\]].other-address")[0].checked) {
+        formData.delete('order[bill_address_attributes][id]');
+      }
       formData.append('payment_method_id', '<%= payment_method.id %>');
       formData.append('orderID', data.orderID);
       return fetch('/paypal/capture_order', {
