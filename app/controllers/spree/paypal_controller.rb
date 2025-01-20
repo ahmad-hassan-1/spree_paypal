@@ -28,6 +28,34 @@ module Spree
         order.save
         order.next until order.completed? || order.errors.any?
         order.finalize!
+        begin
+          if params['order']['email_me']
+            address = order.ship_address
+            gibbon = ::Gibbon::Request.new(api_key: SpreeMailchimpEcommerce.configuration.mailchimp_api_key)
+            gibbon.lists(::SpreeMailchimpEcommerce.configuration.mailchimp_list_id)
+                  .members
+                  .create(
+                    body: {
+                      email_address: order.email,
+                      status: "subscribed", 
+                      merge_fields: {
+                        FNAME: address.firstname,
+                        LNAME: address.lastname,
+                        ADDRESS: [
+                          address.address1,
+                          address.address2,
+                          address.city,
+                          address.state_name,
+                          address.zipcode,
+                          address.country_name
+                        ].compact.join(', '),
+                        PHONE: address.phone
+                      }
+                    }
+                  )
+          end
+        rescue
+        end
         render json: { status: 'success', details: response }, status: :ok
       else
         render json: { error: 'Capture failed' }, status: :unprocessable_entity
