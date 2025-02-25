@@ -3,7 +3,11 @@ module Spree
     protect_from_forgery with: :null_session
 
     def create_order
-      order = current_order
+      if params[:order_id]
+        order = Spree::Order.find(params[:order_id])
+      else
+        order = current_order
+      end
       payment_method = Spree::PaymentMethod.find(params[:payment_method_id])
 
       service = SpreePaypal::PaypalService.new(payment_method)
@@ -17,7 +21,11 @@ module Spree
     end
 
     def capture_order
-      order = current_order
+      if params[:order_id]
+        order = Spree::Order.find(params[:order_id])
+      else
+        order = current_order
+      end
       payment_method = Spree::PaymentMethod.find(params[:payment_method_id])
       service = SpreePaypal::PaypalService.new(payment_method)
       response = service.capture_order(params[:orderID])

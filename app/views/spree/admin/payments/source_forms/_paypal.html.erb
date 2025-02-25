@@ -1,0 +1,62 @@
+<script src="https://www.paypal.com/sdk/js?client-id=<%= payment_method.preferred_client_id %>"></script>
+
+<div id="admin-paypal-button-container"></div>
+
+<script>
+  document.addEventListener("turbo:load", () => {
+    if ($('#admin-paypal-button-container').length > 0) {
+      paypal.Buttons({
+        createOrder: async function(data, actions) {
+          try {
+            const response = await fetch('/paypal/create_order', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-Token': '<%= form_authenticity_token %>'
+              },
+              body: JSON.stringify({
+                payment_method_id: '<%= payment_method.id %>',
+                order_id: '<%= @order.id %>'
+              })
+            });
+        
+            if (!response.ok) {
+              throw new Error(`Server error: ${response.statusText}`);
+            }
+        
+            const orderData = await response.json();
+        
+            if (!orderData.orderID) {
+              throw new Error('Order ID not found in response');
+            }
+        
+            return orderData.orderID;
+        
+          } catch (error) {
+            console.error('Error creating PayPal order:', error);
+            alert('There was an issue creating the PayPal order. Please try again later.');
+            return null;
+          }
+        },
+        onApprove: function(data, actions) {
+          const formData = new FormData(jQuery('form')[0]);
+          formData.delete('_method');
+          formData.append('payment_method_id', '<%= payment_method.id %>');
+          formData.append('order_id', '<%= @order.id %>');
+          formData.append('orderID', data.orderID);
+          return fetch('/paypal/capture_order', {
+            method: 'post',
+            headers: {
+              'X-CSRF-Token': '<%= form_authenticity_token %>'
+            },
+            body: formData
+          }).then(function(res) {
+            return res.json();
+          }).then(function(details) {
+            window.location.href = '<%= admin_order_payments_path(@order) %>';
+          });
+        }
+      }).render('#admin-paypal-button-container');
+    }
+  })
+</script>
