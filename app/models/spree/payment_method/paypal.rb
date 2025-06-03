@@ -39,5 +39,11 @@ module Spree
     def sandbox?
       preferred_sandbox
     end
+
+    def cancel(_response_code, _payment)
+      ActiveMerchant::Billing::Response.new(true, 'PayPal payment cancelled', {}, {})
+    rescue => e
+      ActiveMerchant::Billing::Response.new(false, e.message, {}, {})
+    end
   end
 end
