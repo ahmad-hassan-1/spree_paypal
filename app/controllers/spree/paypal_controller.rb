@@ -83,13 +83,14 @@ module Spree
         payment_method_id: payment_method.id,
         transaction_id: paypal_response['id']
       )
+      debugger
       payment = order.payments.first
       if payment
         payment.update(
           payment_method: payment_method,
           amount: order.total,
           state: 'checkout',
-          response_code: paypal_response['id'],
+          response_code: paypal_response.dig("purchase_units", 0, "payments", "captures", 0, "id") || paypal_response['id'],
           source: paypal_source, # You could create a PayPal-specific payment source if necessary
           avs_response: paypal_response['payer']['payer_id']
         )
@@ -98,7 +99,7 @@ module Spree
           payment_method: payment_method,
           amount: order.total,
           state: 'checkout',
-          response_code: paypal_response['id'],
+          response_code: paypal_response.dig("purchase_units", 0, "payments", "captures", 0, "id") || paypal_response['id'],
           source: paypal_source, # You could create a PayPal-specific payment source if necessary
           avs_response: paypal_response['payer']['payer_id']
         )

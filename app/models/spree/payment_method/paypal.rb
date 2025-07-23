@@ -25,7 +25,7 @@ module Spree
     end
 
     def provider_class
-      ::PaypalService
+      SpreePaypal::PaypalService
     end
 
     def client_id
@@ -40,8 +40,13 @@ module Spree
       preferred_sandbox
     end
 
-    def cancel(_response_code, _payment)
-      ActiveMerchant::Billing::Response.new(true, 'PayPal payment cancelled', {}, {})
+    def cancel(response_code, payment)
+      result = provider_class.new(payment.payment_method).refund(payment)
+      if result['name'] == 'RESOURCE_NOT_FOUND'
+        ActiveMerchant::Billing::Response.new(false, 'The specified PayPal resource does not exist', result, {})
+      else
+        ActiveMerchant::Billing::Response.new(true, 'PayPal payment refunded', result, {})
+      end
     rescue => e
       ActiveMerchant::Billing::Response.new(false, e.message, {}, {})
     end
