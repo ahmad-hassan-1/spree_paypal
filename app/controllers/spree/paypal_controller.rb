@@ -66,7 +66,7 @@ module Spree
         end
         render json: { status: 'success', details: response }, status: :ok
       else
-        render json: { error: 'Capture failed' }, status: :unprocessable_entity
+        render json: { error: 'Capture failed', details: response }, status: :unprocessable_entity
       end
     end
 

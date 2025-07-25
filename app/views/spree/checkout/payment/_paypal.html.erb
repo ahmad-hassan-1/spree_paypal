@@ -68,6 +68,21 @@
       }).then(function(res) {
         return res.json();
       }).then(function(details) {
+        if (details.error) {
+          if (details.details && details.details.details && details.details.details[0]) {
+            const issue = details.details.details[0].issue;
+            const description = details.details.details[0].description;
+            
+            if (issue === 'INSTRUMENT_DECLINED') {
+              alert('Payment declined: ' + description);
+            } else {
+              alert('Payment error: ' + details.error);
+            }
+          } else {
+            alert('Payment error: ' + details.error); 
+          }
+          return;
+        }
         window.location.href = '<%= spree.order_path(@order) %>';
       });
     }
