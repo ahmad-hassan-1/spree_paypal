@@ -83,7 +83,6 @@ module Spree
         payment_method_id: payment_method.id,
         transaction_id: paypal_response['id']
       )
-      debugger
       payment = order.payments.first
       if payment
         payment.update(
