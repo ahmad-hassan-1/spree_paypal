@@ -42,18 +42,18 @@ module SpreePaypal
       JSON.parse(response.body)
     end
 
-    def refund(payment)
+    def refund_by_capture_id(capture_id, amount, originator)
       auth_token = authenticate
-      capture_id = payment.response_code
 
       uri = URI.parse("#{@api_base_url}/v2/payments/captures/#{capture_id}/refund")
       request = Net::HTTP::Post.new(uri)
       request["Authorization"] = "Bearer #{auth_token}"
       request["Content-Type"] = "application/json"
+
       request.body = {
         amount: {
-          value: payment.amount.to_s,
-          currency_code: payment.currency
+          value: amount.to_s('F'),
+          currency_code: originator.order.currency
         }
       }.to_json
 
