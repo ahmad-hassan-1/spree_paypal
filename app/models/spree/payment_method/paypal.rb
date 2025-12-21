@@ -40,7 +40,7 @@ module Spree
       preferred_sandbox
     end
 
-    def cancel(response_code, payment)
+    def credit(response_code, payment)
       result = provider_class.new(payment.payment_method).refund(payment)
       if result['name'] == 'RESOURCE_NOT_FOUND'
         ActiveMerchant::Billing::Response.new(false, 'The specified PayPal resource does not exist', result, {})
