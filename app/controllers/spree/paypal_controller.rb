@@ -35,7 +35,7 @@ module Spree
         process_spree_payment(order, payment_method, response)
         order.save
         order.next until order.completed? || order.errors.any?
-        order.finalize!
+        # order.finalize!
         begin
           if params['order']['email_me']
             address = order.ship_address
