@@ -40,6 +40,18 @@ module Spree
       preferred_sandbox
     end
 
+    def cancel(response_code, payment)
+      result = provider_class.new(self).refund_by_capture_id(response_code, payment.amount, payment)
+      
+      if result['name'] == 'RESOURCE_NOT_FOUND'
+        ActiveMerchant::Billing::Response.new(false, 'The specified PayPal resource does not exist', result)
+      else
+        ActiveMerchant::Billing::Response.new(true, 'PayPal payment refunded', result)
+      end
+    rescue => e
+      ActiveMerchant::Billing::Response.new(false, e.message, {})
+    end
+
     def credit(amount_cents, response_code, options = {})
       amount = BigDecimal(amount_cents) / 100
 
