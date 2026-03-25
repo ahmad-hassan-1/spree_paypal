@@ -34,7 +34,7 @@ module Spree
         order.update_from_params(params, permitted_checkout_attributes)
         process_spree_payment(order, payment_method, response)
         unless order.save
-          return render json: { error: order.errors.full_messages }, status: :unprocessable_entity
+          Rails.logger.error "Failed to save order #{order.number}: #{order.errors.full_messages.join(', ')}"
         end
 
         order.next until order.completed? || order.errors.any?
