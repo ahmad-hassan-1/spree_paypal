@@ -33,9 +33,16 @@ module Spree
       if response['status'] == 'COMPLETED'
         order.update_from_params(params, permitted_checkout_attributes)
         process_spree_payment(order, payment_method, response)
-        order.save
+        unless order.save
+          return render json: { error: order.errors.full_messages }, status: :unprocessable_entity
+        end
+
         order.next until order.completed? || order.errors.any?
-        # order.finalize!
+
+        if order.errors.any?
+          Rails.logger.error "Order #{order.number} failed to complete: #{order.errors.full_messages.join(', ')}"
+          order.finalize!
+        end
         begin
           if params['order']['email_me']
             address = order.ship_address
