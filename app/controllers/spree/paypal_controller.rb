@@ -21,60 +21,81 @@ module Spree
     end
 
     def capture_order
-      if params[:order_id]
-        order = Spree::Order.find(params[:order_id])
-      else
-        order = current_order
-      end
+      order = params[:order_id] ? Spree::Order.find(params[:order_id]) : current_order
       payment_method = Spree::PaymentMethod.find(params[:payment_method_id])
       service = SpreePaypal::PaypalService.new(payment_method)
+
+      if order.update_from_params(params, permitted_checkout_attributes)
+        Rails.logger.info "Order #{order.number} updated successfully from params"
+      else
+        Rails.logger.error "Order #{order.number} update failed: #{order.errors.full_messages.join(', ')}"
+        render json: { error: 'Order update failed', details: order.errors.full_messages }, status: :unprocessable_entity
+        return
+      end
+
+      order.reload
+      if order.shipments.empty?
+        Rails.logger.error "Order #{order.number} has no shipments after update_from_params"
+        render json: { error: 'No shipments found for order' }, status: :unprocessable_entity
+        return
+      end
+
       response = service.capture_order(params[:orderID])
+      if response['status'] != 'COMPLETED'
+        Rails.logger.error "PayPal capture failed for order #{order.number}: #{response}"
+        render json: { error: 'Capture failed', details: response }, status: :unprocessable_entity
+        return
+      end
 
-      if response['status'] == 'COMPLETED'
-        order.update_from_params(params, permitted_checkout_attributes)
+      begin
         process_spree_payment(order, payment_method, response)
-        unless order.save
-          Rails.logger.error "Failed to save order #{order.number}: #{order.errors.full_messages.join(', ')}"
-        end
+      rescue => e
+        Rails.logger.error "Payment processing failed for order #{order.number}: #{e.message}"
+        render json: { error: 'Payment processing failed', details: e.message }, status: :unprocessable_entity
+        return
+      end
 
+      begin
         order.next until order.completed? || order.errors.any?
-
         if order.errors.any?
           Rails.logger.error "Order #{order.number} failed to complete: #{order.errors.full_messages.join(', ')}"
           order.finalize!
         end
-        begin
-          if params['order']['email_me']
-            address = order.ship_address
-            gibbon = ::Gibbon::Request.new(api_key: SpreeMailchimpEcommerce.configuration.mailchimp_api_key)
-            gibbon.lists(::SpreeMailchimpEcommerce.configuration.mailchimp_list_id)
-                  .members
-                  .create(
-                    body: {
-                      email_address: order.email,
-                      status: "subscribed", 
-                      merge_fields: {
-                        FNAME: address.firstname,
-                        LNAME: address.lastname,
-                        ADDRESS: [
-                          address.address1,
-                          address.address2,
-                          address.city,
-                          address.state_name,
-                          address.zipcode,
-                          address.country_name
-                        ].compact.join(', '),
-                        PHONE: address.phone
-                      }
-                    }
-                  )
-          end
-        rescue
-        end
-        render json: { status: 'success', details: response }, status: :ok
-      else
-        render json: { error: 'Capture failed', details: response }, status: :unprocessable_entity
+      rescue => e
+        Rails.logger.error "Order finalization failed for #{order.number}: #{e.message}"
       end
+
+      begin
+        if params.dig('order', 'email_me') && order.ship_address.present?
+          address = order.ship_address
+          gibbon = ::Gibbon::Request.new(api_key: SpreeMailchimpEcommerce.configuration.mailchimp_api_key)
+          gibbon.lists(::SpreeMailchimpEcommerce.configuration.mailchimp_list_id)
+                .members
+                .create(
+                  body: {
+                    email_address: order.email,
+                    status: "subscribed",
+                    merge_fields: {
+                      FNAME: address.firstname,
+                      LNAME: address.lastname,
+                      ADDRESS: [
+                        address.address1,
+                        address.address2,
+                        address.city,
+                        address.state_name,
+                        address.zipcode,
+                        address.country_name
+                      ].compact.join(', '),
+                      PHONE: address.phone
+                    }
+                  }
+                )
+        end
+      rescue => e
+        Rails.logger.error "Mailchimp subscription failed for order #{order.number}: #{e.message}"
+      end
+
+      render json: { status: 'success', details: response }, status: :ok
     end
 
     private
