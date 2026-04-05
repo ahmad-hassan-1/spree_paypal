@@ -21,6 +21,11 @@ module Spree
     end
 
     def capture_order
+      if params[:order][:email].empty?
+        render json: { error: 'Email is required' }, status: :unprocessable_entity
+        return
+      end
+
       order = params[:order_id] ? Spree::Order.find(params[:order_id]) : current_order
       payment_method = Spree::PaymentMethod.find(params[:payment_method_id])
       service = SpreePaypal::PaypalService.new(payment_method)
