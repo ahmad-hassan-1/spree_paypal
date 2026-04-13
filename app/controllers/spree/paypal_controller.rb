@@ -21,7 +21,7 @@ module Spree
     end
 
     def capture_order
-      if params[:order][:email].empty?
+      if params[:order][:email]&.empty?
         render json: { error: 'Email is required' }, status: :unprocessable_entity
         return
       end
