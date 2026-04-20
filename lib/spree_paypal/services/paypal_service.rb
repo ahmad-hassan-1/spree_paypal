@@ -63,7 +63,7 @@ module SpreePaypal
 
     def add_tracking(transaction_id, tracking_number, carrier, status = "SHIPPED")
       auth_token = authenticate
-      byebug
+  
       uri = URI.parse("#{@api_base_url}/v1/shipping/trackers-batch")
       request = Net::HTTP::Post.new(uri)
       request["Authorization"] = "Bearer #{auth_token}"
