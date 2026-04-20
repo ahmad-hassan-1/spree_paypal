@@ -61,6 +61,29 @@ module SpreePaypal
       JSON.parse(response.body)
     end
 
+    def add_tracking(transaction_id, tracking_number, carrier, status = "SHIPPED")
+      auth_token = authenticate
+      byebug
+      uri = URI.parse("#{@api_base_url}/v1/shipping/trackers-batch")
+      request = Net::HTTP::Post.new(uri)
+      request["Authorization"] = "Bearer #{auth_token}"
+      request["Content-Type"] = "application/json"
+
+      request.body = {
+        trackers: [
+          {
+            transaction_id: transaction_id,
+            tracking_number: tracking_number,
+            status: status,
+            carrier: carrier
+          }
+        ]
+      }.to_json
+
+      response = send_request(uri, request)
+      JSON.parse(response.body)
+    end
+
     private
 
     def authenticate
@@ -83,6 +106,7 @@ module SpreePaypal
         {
           name: line_item.product.name,
           quantity: line_item.quantity.to_s,
+          sku: line_item.variant&.sku.to_s[0, 127],
           unit_amount: {
             currency_code: order.currency || 'USD',
             value: line_item.price.to_s
