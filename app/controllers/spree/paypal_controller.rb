@@ -21,9 +21,17 @@ module Spree
     end
 
     def capture_order
-      if params[:order][:email]&.empty?
+      if params[:order]&[:email]&.empty?
         render json: { error: 'Email is required' }, status: :unprocessable_entity
         return
+      end
+
+      if params[:order]&[:bill_address_attributes].present?
+        check_required_fields = %w[firstname lastname address1 city state_id zipcode country_id]
+        if params[:order][:bill_address_attributes].values_at(*check_required_fields).any?(&:blank?)
+          render json: { error: 'All bill address attributes are required' }, status: :unprocessable_entity
+          return
+        end
       end
 
       order = params[:order_id] ? Spree::Order.find(params[:order_id]) : current_order
