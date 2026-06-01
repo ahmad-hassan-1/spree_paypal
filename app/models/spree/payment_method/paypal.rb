@@ -24,6 +24,30 @@ module Spree
       source.payment_method.is_a?(Spree::PaymentMethod::Paypal)
     end
 
+    def capture(response_code, amount, currency)
+      result = provider_class.new(self).capture_authorized_payment(response_code, amount, currency)
+
+      if result['name'] == 'RESOURCE_NOT_FOUND'
+        ActiveMerchant::Billing::Response.new(false, 'The specified PayPal resource does not exist', result)
+      else
+        payment = Spree::Payment.find_by(response_code: response_code)
+        payment.update!(response_code: result['id']) if payment
+        ActiveMerchant::Billing::Response.new(true, 'PayPal payment captured', result)
+      end
+    rescue => e
+      ActiveMerchant::Billing::Response.new(false, e.message, {})
+    end
+
+    def reauthorize(response_code, order, payment)
+      byebug
+
+      result = provider_class.new(self).void_and_authorize(response_code,order)
+      ActiveMerchant::Billing::Response.new(true, 'PayPal payment reauthorized', result)
+      payment.update!(response_code: result['authorization_id']) if payment
+    rescue => e
+      ActiveMerchant::Billing::Response.new(false, e.message, {})
+    end
+
     def provider_class
       SpreePaypal::PaypalService
     end
@@ -41,8 +65,14 @@ module Spree
     end
 
     def cancel(response_code, payment)
-      result = provider_class.new(self).refund_by_capture_id(response_code, payment.amount, payment)
+      result = {}
       
+      if payment.state == 'pending'
+        result = provider_class.new(self).void_authorization(response_code)
+      else
+        result = provider_class.new(self).refund_by_capture_id(response_code, payment.amount, payment)
+      end
+
       if result['name'] == 'RESOURCE_NOT_FOUND'
         ActiveMerchant::Billing::Response.new(false, 'The specified PayPal resource does not exist', result)
       else
