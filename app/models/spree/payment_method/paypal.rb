@@ -39,8 +39,6 @@ module Spree
     end
 
     def reauthorize(response_code, order, payment)
-      byebug
-
       result = provider_class.new(self).void_and_authorize(response_code,order)
       ActiveMerchant::Billing::Response.new(true, 'PayPal payment reauthorized', result)
       payment.update!(response_code: result['authorization_id']) if payment
