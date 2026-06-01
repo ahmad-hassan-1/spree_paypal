@@ -20,7 +20,7 @@ module Spree
       end
     end
 
-    def capture_order
+    def authorize_order
       if params[:order]&.[](:email)&.empty?
         render json: { error: 'Email is required' }, status: :unprocessable_entity
         return
@@ -52,11 +52,10 @@ module Spree
         render json: { error: 'No shipments found for order' }, status: :unprocessable_entity
         return
       end
-
-      response = service.capture_order(params[:orderID])
+      response = service.authorize_order(params[:orderID])
       if response['status'] != 'COMPLETED'
-        Rails.logger.error "PayPal capture failed for order #{order.number}: #{response}"
-        render json: { error: 'Capture failed', details: response }, status: :unprocessable_entity
+        Rails.logger.error "PayPal authorization failed for order #{order.number}: #{response}"
+        render json: { error: 'Authorization failed', details: response }, status: :unprocessable_entity
         return
       end
 
@@ -116,6 +115,11 @@ module Spree
     def process_spree_payment(order, payment_method, paypal_response)
       payer_info = paypal_response.dig('payer', 'name') || {}
 
+      authorization_id = paypal_response.dig('purchase_units', 0, 'payments', 'authorizations', 0, 'id')
+      if authorization_id.blank?
+        raise "PayPal authorization id missing from response (PayPal order #{paypal_response['id']}); refusing to store an uncapturable response_code."
+      end
+
       paypal_source = Spree::Paypal.create!(
         payer_id: paypal_response['payer']['payer_id'],
         first_name: payer_info['given_name'],
@@ -124,29 +128,26 @@ module Spree
         payment_method_id: payment_method.id,
         transaction_id: paypal_response['id']
       )
-      payment = order.payments.first
-      if payment
-        payment.update(
-          payment_method: payment_method,
-          amount: order.total,
-          state: 'checkout',
-          response_code: paypal_response.dig("purchase_units", 0, "payments", "captures", 0, "id") || paypal_response['id'],
-          source: paypal_source, # You could create a PayPal-specific payment source if necessary
-          avs_response: paypal_response['payer']['payer_id']
-        )
-      else
-        order.payments.create(
-          payment_method: payment_method,
-          amount: order.total,
-          state: 'checkout',
-          response_code: paypal_response.dig("purchase_units", 0, "payments", "captures", 0, "id") || paypal_response['id'],
-          source: paypal_source, # You could create a PayPal-specific payment source if necessary
-          avs_response: paypal_response['payer']['payer_id']
-        )
-      end
 
-      # Only transition the order if it's not already completed
-      # payment.complete! unless payment.completed?
+      payment_attrs = {
+        payment_method: payment_method,
+        amount: order.outstanding_balance,
+        state: 'pending',
+        response_code: authorization_id,
+        source: paypal_source,
+        avs_response: paypal_response['payer']['payer_id']
+      }
+
+      payment = order.payments
+                     .where(state: %w[checkout pending processing])
+                     .order(created_at: :desc)
+                     .first
+
+      if payment
+        payment.update!(payment_attrs)
+      else
+        order.payments.create!(payment_attrs)
+      end
     end
   end
 end
