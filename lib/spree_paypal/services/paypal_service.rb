@@ -179,13 +179,17 @@ module SpreePaypal
         item_total = 0
 
         order.shipments.pending.map do |shipment|
+          next if shipment.free_replacement?
+
           shipping_total += shipment.cost
           
-          items = shipment.line_items.map do |line_item|
-            item_total += line_item.price * line_item.quantity
+          items = shipment.manifest.map do |manifest_item|
+            line_item = manifest_item.first
+            quantity = manifest_item.states["on_hand"]
+            item_total += line_item.price * quantity
             {
               name: line_item.product.name,
-              quantity: line_item.quantity.to_s,
+              quantity: quantity.to_s,
               sku: line_item.variant&.sku.to_s[0, 127],
               unit_amount: {
                 currency_code: order.currency || 'USD',
