@@ -31,7 +31,7 @@ module Spree
         ActiveMerchant::Billing::Response.new(false, 'The specified PayPal resource does not exist', result)
       else
         payment = Spree::Payment.find_by(response_code: response_code)
-        payment.update!(response_code: result['id']) if payment
+        payment.update!(response_code: result['id'], amount: amount) if payment
         ActiveMerchant::Billing::Response.new(true, 'PayPal payment captured', result)
       end
     rescue => e

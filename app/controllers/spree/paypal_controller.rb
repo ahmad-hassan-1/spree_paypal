@@ -78,6 +78,14 @@ module Spree
       end
 
       begin
+        order.shipments.each do |shipment|
+          shipment.update(state: 'ready')
+        end
+      rescue => e
+        Rails.logger.error "Shipment processing failed for order #{order.number}: #{e.message}"
+      end
+      
+      begin
         if params.dig('order', 'email_me') && order.ship_address.present?
           address = order.ship_address
           gibbon = ::Gibbon::Request.new(api_key: SpreeMailchimpEcommerce.configuration.mailchimp_api_key)
