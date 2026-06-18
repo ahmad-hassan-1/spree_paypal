@@ -54,7 +54,8 @@ module SpreePaypal
         amount: {
           value: amount.to_s,
           currency_code: currency
-        }
+        },
+        final_capture: true
       }.to_json
 
       response = send_request(uri, request)
