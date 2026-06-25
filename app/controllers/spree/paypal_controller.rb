@@ -78,7 +78,7 @@ module Spree
       end
 
       begin
-        order.shipments.each do |shipment|
+        order.shipments.pending.each do |shipment|
           shipment.update(state: 'ready')
         end
       rescue => e
