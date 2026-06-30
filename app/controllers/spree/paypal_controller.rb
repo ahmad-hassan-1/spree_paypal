@@ -84,6 +84,8 @@ module Spree
       rescue => e
         Rails.logger.error "Shipment processing failed for order #{order.number}: #{e.message}"
       end
+
+      order.update(shipment_state: 'ready')
       
       begin
         if params.dig('order', 'email_me') && order.ship_address.present?
