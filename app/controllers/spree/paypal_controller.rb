@@ -117,6 +117,8 @@ module Spree
         Rails.logger.error "Mailchimp subscription failed for order #{order.number}: #{e.message}"
       end
 
+      Spree::MasterInventory::SyncOrderJob.perform_async(order.id, 'sync')
+
       render json: { status: 'success', details: response }, status: :ok
     end
 
